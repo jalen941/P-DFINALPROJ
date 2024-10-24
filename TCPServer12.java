@@ -12,7 +12,7 @@ import java.net.*;
       BufferedReader in = null; // for reading form ServerRouter
 			InetAddress addr = InetAddress.getLocalHost();
 			String host = addr.getHostAddress(); // Server machine's IP			
-			String routerName = "172.20.10.2"; // ServerRouter host name
+			String routerName = "172.20.10.3"; // ServerRouter host name aka your ipconfig
 			int SockNum = 5555; // port number
 			
 			// Tries to connect to the ServerRouter
@@ -33,7 +33,7 @@ import java.net.*;
    	// Variables for message passing			
       String fromServer; // messages sent to ServerRouter
       String fromClient; // messages received from ServerRouter      
-			String address ="172.20.10.7"; // destination IP (Client)
+			String address ="172.20.10.7"; // destination IP (Client) clients ipconfig
 			
 			// Communication process (initial sends/receives)
 			out.println(address);// initial send (IP of the destination Client)
@@ -45,7 +45,8 @@ import java.net.*;
          System.out.println("Client said: " + fromClient);
          if (fromClient.equals("Bye.")) // exit statement
 					break;
-				fromServer = fromClient.toUpperCase(); // converting received message to upper case
+               fromServer = fromClient;
+				//fromServer = fromClient.toUpperCase(); // converting received message to upper case
 				System.out.println("Server said: " + fromServer);
          out.println(fromServer); // sending the converted message back to the Client via ServerRouter
       }
