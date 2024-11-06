@@ -1,18 +1,17 @@
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.List;
 import java.util.regex.Pattern;
 
 public class TCPServer12 {
     public static void main(String[] args) throws IOException {
         // Variables for setting up connection and communication
-        Socket socket = null; // socket to connect with ServerRouter
-        PrintWriter out = null; // for writing to ServerRouter
-        BufferedReader in = null; // for reading from ServerRouter
+        Socket socket = null;
+        PrintWriter out = null;
+        BufferedReader in = null;
         InetAddress addr = InetAddress.getLocalHost();
-        String routerName = "172.20.10.3"; // ServerRouter host name (replace with your IP)
+        String routerName = "172.20.10.2"; // ServerRouter host name (replace with your IP)
         int SockNum = 5555; // port number
 
         // Tries to connect to the ServerRouter
@@ -31,58 +30,60 @@ public class TCPServer12 {
         // Message variables
         String fromServer;
         String fromClient;
-        String address = "172.20.10.7"; // destination IP (Client)
+        String address = "172.20.10.5"; // destination IP (Client)
 
         // Initial connection setup
         out.println(address);
         fromClient = in.readLine();
         System.out.println("ServerRouter: " + fromClient);
 
-        // Store matrices
-        int[][] previousMatrix = null;
+        // List to store all incoming matrices
+        List<int[][]> matrices = new ArrayList<>();
         boolean readyToMultiply = false;
 
         // Communication while loop
         while ((fromClient = in.readLine()) != null) {
             System.out.println("Client said: " + fromClient);
-
+        
             if (fromClient.equals("Bye.")) // exit statement
                 break;
-
-            if (!isIPAddress(fromClient) && !fromClient.equals("*")) {
-                int[][] currentMatrix = parseMessageTo2DArray(fromClient);
-                System.out.println("Parsed current matrix: " + matrixToString(currentMatrix));
-
-                if (readyToMultiply && previousMatrix != null) {
-                    // Multiply previousMatrix and currentMatrix
-                    System.out.println("Multiplying matrices:");
-                    System.out.println("Previous matrix:\n" + matrixToString(previousMatrix));
-                    System.out.println("Current matrix:\n" + matrixToString(currentMatrix));
-
-                    int[][] resultMatrix = Strassen.multiply(new int[][][]{previousMatrix, currentMatrix}, 5);
-
+        
+            // Handle the "End" message separately
+            if (fromClient.equals("End")) {
+                System.out.println("Received 'End', performing final multiplication...");
+                // Perform Strassen multiplication of all matrices in the list
+                if (matrices.size() >= 2) {
+                    int[][][] matrixArray = matrices.toArray(new int[matrices.size()][][]);
+                    System.out.println("Starting logic to get the result");
+        
+                    // Use the Strassen method to multiply all matrices
+                    int[][] resultMatrix = Strassen.multiply(matrixArray, 5);
+        
                     // Log result and send to client
                     String resultString = matrixToString(resultMatrix);
                     System.out.println("Multiplication result:\n" + resultString);
                     out.println(resultString);
-
-                    // Update previousMatrix to the result for next potential multiplication
-                    previousMatrix = resultMatrix;
-                    readyToMultiply = false;
                 } else {
-                    // Store the matrix as previousMatrix for the next round
-                    previousMatrix = currentMatrix;
-                    System.out.println("Stored as previous matrix:\n" + matrixToString(previousMatrix));
+                    out.println("Insufficient matrices to perform multiplication.");
                 }
+        
+                // Clear matrices after final multiplication
+                matrices.clear();
+                readyToMultiply = false;
+            } else if (!isIPAddress(fromClient) && !fromClient.equals("*")) {
+                int[][] currentMatrix = parseMessageTo2DArray(fromClient);
+                System.out.println("Parsed current matrix: " + matrixToString(currentMatrix));
+                matrices.add(currentMatrix); // Add matrix to list
             } else if (fromClient.equals("*")) {
                 System.out.println("Received '*', ready to multiply with the next matrix.");
                 readyToMultiply = true;
             }
-
+        
             fromServer = fromClient;
             System.out.println("Server said: " + fromServer);
             out.println(fromServer); // Echo back to client
         }
+        
 
         // Closing connections
         out.close();
@@ -111,7 +112,7 @@ public class TCPServer12 {
         return matrix;
     }
 
-    // Method to convert a 2D array to a string (for uniqueness check)
+    // Method to convert a 2D array to a string
     private static String matrixToString(int[][] matrix) {
         StringBuilder sb = new StringBuilder();
         for (int[] row : matrix) {
@@ -119,11 +120,8 @@ public class TCPServer12 {
                 sb.append(value).append(",");
             }
             sb.deleteCharAt(sb.length() - 1); // Remove trailing comma
-          sb.append(";"); // Adds newline for better debug formatting
-               // sb.append(";"); // Adds newline for better debug formatting
-
+            sb.append(";"); // Adds semicolon for separating rows
         }
-        //sb.deleteCharAt(sb.length() - 2); // Remove trailing newline and semicolon
         return sb.toString();
     }
 }

@@ -23,49 +23,55 @@ public class Strassen {
 
     // Method to build the binary tree
     private static TreeNode buildTree(int[][][] matrices) {
-        TreeNode[] leaves = new TreeNode[matrices.length];
+        TreeNode[] nodes = new TreeNode[matrices.length];
         for (int i = 0; i < matrices.length; i++) {
-            leaves[i] = new TreeNode(matrices[i]);
+            nodes[i] = new TreeNode(matrices[i]);
         }
-
-        // Create the binary tree from the leaves
-        while (leaves.length > 1) {
-            int newSize = (leaves.length + 1) / 2; // New size for the next level
-            TreeNode[] parents = new TreeNode[newSize];
-
+    
+        // Build a tree-like structure from the bottom up, combining pairs of matrices
+        while (nodes.length > 1) {
+            int newSize = (nodes.length + 1) / 2;
+            TreeNode[] nextLevelNodes = new TreeNode[newSize];
+    
             for (int i = 0; i < newSize; i++) {
-                TreeNode left = leaves[i * 2];
-                TreeNode right = (i * 2 + 1 < leaves.length) ? leaves[i * 2 + 1] : null; // Handle odd count
-                parents[i] = new TreeNode(left, right);
+                TreeNode left = nodes[i * 2];
+                TreeNode right = (i * 2 + 1 < nodes.length) ? nodes[i * 2 + 1] : null;
+                nextLevelNodes[i] = new TreeNode(left, right);
             }
-            leaves = parents; // Move to the next level
+            nodes = nextLevelNodes;
         }
-
-        return leaves[0]; // Return the root of the tree
+        return nodes[0];
     }
-
-    // Execute the tree multiplication
+    
+    // Recursive function to execute matrix multiplication in tree structure
     private static int[][] executeTree(TreeNode node, int numCores) {
         if (node.isLeaf()) {
-            return node.matrix; // Leaf node, return the matrix
+            return node.matrix;
         }
-
+    
         ExecutorService executor = Executors.newFixedThreadPool(numCores);
         Future<int[][]> leftFuture = executor.submit(() -> executeTree(node.left, numCores));
-        Future<int[][]> rightFuture = executor.submit(() -> executeTree(node.right, numCores));
-
+        Future<int[][]> rightFuture = node.right != null ? executor.submit(() -> executeTree(node.right, numCores)) : null;
+    
         int[][] leftResult = null;
         int[][] rightResult = null;
         try {
-            leftResult = leftFuture.get();   // Get left multiplication result
-            rightResult = rightFuture.get(); // Get right multiplication result
+            leftResult = leftFuture.get(); // Left result
+            if (rightFuture != null) {
+                rightResult = rightFuture.get(); // Right result if it exists
+            }
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
             executor.shutdown();
         }
-
-        return strassen(leftResult, rightResult, leftResult.length); // Perform Strassen on the results
+    
+        if (rightResult == null) {
+            return leftResult; // Return the left result if there's no right node
+        }
+    
+        // Multiply left and right results using Strassen
+        return strassen(leftResult, rightResult, leftResult.length);
     }
 
     private static int[][] strassen(int[][] A, int[][] B, int n) {
