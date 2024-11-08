@@ -1,133 +1,91 @@
-
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Callable;
 
 public class Strassen {
 
-    // Entry point to multiply matrices transmitted from client
-    public static int[][] multiply(int[][][] matrices, int numCores) {
-        int n = matrices.length; // Number of matrices
-        // Validate that n is a power of 2
-        if (n <= 0 || (n & (n - 1)) != 0) {
-            throw new IllegalArgumentException("Number of matrices must be a power of 2.");
-        }
-        
-        // Build binary tree from matrices
-        TreeNode root = buildTree(matrices);
-        
-        // Execute the multiplication process
-        return executeTree(root, numCores);
-    }
-
-    // Method to build the binary tree
-    private static TreeNode buildTree(int[][][] matrices) {
-        TreeNode[] nodes = new TreeNode[matrices.length];
-        for (int i = 0; i < matrices.length; i++) {
-            nodes[i] = new TreeNode(matrices[i]);
-        }
-    
-        // Build a tree-like structure from the bottom up, combining pairs of matrices
-        while (nodes.length > 1) {
-            int newSize = (nodes.length + 1) / 2;
-            TreeNode[] nextLevelNodes = new TreeNode[newSize];
-    
-            for (int i = 0; i < newSize; i++) {
-                TreeNode left = nodes[i * 2];
-                TreeNode right = (i * 2 + 1 < nodes.length) ? nodes[i * 2 + 1] : null;
-                nextLevelNodes[i] = new TreeNode(left, right);
-            }
-            nodes = nextLevelNodes;
-        }
-        return nodes[0];
-    }
-    
-    // Recursive function to execute matrix multiplication in tree structure
-    private static int[][] executeTree(TreeNode node, int numCores) {
-        if (node.isLeaf()) {
-            return node.matrix;
-        }
-    
+    public static long[][] multiply(long[][][] matrices, int numCores) throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(numCores);
-        Future<int[][]> leftFuture = executor.submit(() -> executeTree(node.left, numCores));
-        Future<int[][]> rightFuture = node.right != null ? executor.submit(() -> executeTree(node.right, numCores)) : null;
-    
-        int[][] leftResult = null;
-        int[][] rightResult = null;
-        try {
-            leftResult = leftFuture.get(); // Left result
-            if (rightFuture != null) {
-                rightResult = rightFuture.get(); // Right result if it exists
+
+        Node[] leafNodes = new Node[matrices.length];
+        for (int i = 0; i < matrices.length; i++) {
+            leafNodes[i] = new Node(matrices[i]);
+        }
+
+        while (leafNodes.length > 1) {
+            Node[] parentNodes = new Node[(leafNodes.length + 1) / 2];
+            for (int i = 0; i < leafNodes.length; i += 2) {
+                if (i + 1 < leafNodes.length) {
+                    parentNodes[i / 2] = new Node(leafNodes[i], leafNodes[i + 1], executor);
+                } else {
+                    parentNodes[i / 2] = leafNodes[i];
+                }
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            executor.shutdown();
+            leafNodes = parentNodes;
         }
-    
-        if (rightResult == null) {
-            return leftResult; // Return the left result if there's no right node
-        }
-    
-        // Multiply left and right results using Strassen
-        return strassen(leftResult, rightResult, leftResult.length);
+
+        Node root = leafNodes[0];
+        long[][] finalProduct = root.getResult();
+
+        executor.shutdown();
+        return finalProduct;
     }
 
-    private static int[][] strassen(int[][] A, int[][] B, int n) {
+    public static long[][] strassenMultiply(long[][] A, long[][] B) {
+        int n = A.length;
+        long[][] C = new long[n][n];
+
         if (n == 1) {
-            return new int[][]{{A[0][0] * B[0][0]}};
+            C[0][0] = A[0][0] * B[0][0];
+            return C;
         }
 
-        // Split matrices into quadrants
-        int k = n / 2;
-        int[][] A11 = new int[k][k], A12 = new int[k][k], A21 = new int[k][k], A22 = new int[k][k];
-        int[][] B11 = new int[k][k], B12 = new int[k][k], B21 = new int[k][k], B22 = new int[k][k];
+        int newSize = n / 2;
+        long[][] a11 = new long[newSize][newSize];
+        long[][] a12 = new long[newSize][newSize];
+        long[][] a21 = new long[newSize][newSize];
+        long[][] a22 = new long[newSize][newSize];
 
-        splitMatrix(A, A11, A12, A21, A22, k);
-        splitMatrix(B, B11, B12, B21, B22, k);
+        long[][] b11 = new long[newSize][newSize];
+        long[][] b12 = new long[newSize][newSize];
+        long[][] b21 = new long[newSize][newSize];
+        long[][] b22 = new long[newSize][newSize];
 
-        // Compute M1 to M7 using Strassen's method
-        int[][] M1 = strassen(add(A11, A22), add(B11, B22), k);
-        int[][] M2 = strassen(add(A21, A22), B11, k);
-        int[][] M3 = strassen(A11, subtract(B12, B22), k);
-        int[][] M4 = strassen(A22, subtract(B21, B11), k);
-        int[][] M5 = strassen(add(A11, A12), B22, k);
-        int[][] M6 = strassen(subtract(A21, A11), add(B11, B12), k);
-        int[][] M7 = strassen(subtract(A12, A22), add(B21, B22), k);
+        split(A, a11, 0, 0);
+        split(A, a12, 0, newSize);
+        split(A, a21, newSize, 0);
+        split(A, a22, newSize, newSize);
 
-        // Combine results into a single matrix C
-        return combineResults(M1, M2, M3, M4, M5, M6, M7, k);
-    }
+        split(B, b11, 0, 0);
+        split(B, b12, 0, newSize);
+        split(B, b21, newSize, 0);
+        split(B, b22, newSize, newSize);
 
-    private static void splitMatrix(int[][] original, int[][] A11, int[][] A12, int[][] A21, int[][] A22, int k) {
-        for (int i = 0; i < k; i++) {
-            for (int j = 0; j < k; j++) {
-                A11[i][j] = original[i][j];
-                A12[i][j] = original[i][j + k];
-                A21[i][j] = original[i + k][j];
-                A22[i][j] = original[i + k][j + k];
-            }
-        }
-    }
+        long[][] M1 = strassenMultiply(add(a11, a22), add(b11, b22));
+        long[][] M2 = strassenMultiply(add(a21, a22), b11);
+        long[][] M3 = strassenMultiply(a11, subtract(b12, b22));
+        long[][] M4 = strassenMultiply(a22, subtract(b21, b11));
+        long[][] M5 = strassenMultiply(add(a11, a12), b22);
+        long[][] M6 = strassenMultiply(subtract(a21, a11), add(b11, b12));
+        long[][] M7 = strassenMultiply(subtract(a12, a22), add(b21, b22));
 
-    private static int[][] combineResults(int[][] M1, int[][] M2, int[][] M3, int[][] M4, int[][] M5, int[][] M6, int[][] M7, int k) {
-        int n = 2 * k;
-        int[][] C = new int[n][n];
-        for (int i = 0; i < k; i++) {
-            for (int j = 0; j < k; j++) {
-                C[i][j] = M1[i][j] + M4[i][j] - M5[i][j] + M7[i][j];
-                C[i][j + k] = M3[i][j] + M5[i][j];
-                C[i + k][j] = M2[i][j] + M4[i][j];
-                C[i + k][j + k] = M1[i][j] - M2[i][j] + M3[i][j] + M6[i][j];
-            }
-        }
+        long[][] c11 = add(subtract(add(M1, M4), M5), M7);
+        long[][] c12 = add(M3, M5);
+        long[][] c21 = add(M2, M4);
+        long[][] c22 = add(subtract(add(M1, M3), M2), M6);
+
+        join(c11, C, 0, 0);
+        join(c12, C, 0, newSize);
+        join(c21, C, newSize, 0);
+        join(c22, C, newSize, newSize);
+
         return C;
     }
 
-    private static int[][] add(int[][] A, int[][] B) {
+    private static long[][] add(long[][] A, long[][] B) {
         int n = A.length;
-        int[][] C = new int[n][n];
+        long[][] C = new long[n][n];
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
                 C[i][j] = A[i][j] + B[i][j];
@@ -136,9 +94,9 @@ public class Strassen {
         return C;
     }
 
-    private static int[][] subtract(int[][] A, int[][] B) {
+    private static long[][] subtract(long[][] A, long[][] B) {
         int n = A.length;
-        int[][] C = new int[n][n];
+        long[][] C = new long[n][n];
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
                 C[i][j] = A[i][j] - B[i][j];
@@ -147,4 +105,49 @@ public class Strassen {
         return C;
     }
 
+    private static void split(long[][] parent, long[][] child, int row, int col) {
+        for (int i = 0; i < child.length; i++) {
+            for (int j = 0; j < child.length; j++) {
+                child[i][j] = parent[i + row][j + col];
+            }
+        }
+    }
+
+    private static void join(long[][] child, long[][] parent, int row, int col) {
+        for (int i = 0; i < child.length; i++) {
+            for (int j = 0; j < child.length; j++) {
+                parent[i + row][j + col] = child[i][j];
+            }
+        }
+    }
+}
+
+class Node {
+    private long[][] matrix;
+    private Node left;
+    private Node right;
+    private Future<long[][]> resultFuture;
+
+    public Node(long[][] matrix) {
+        this.matrix = matrix;
+    }
+
+    public Node(Node left, Node right, ExecutorService executor) {
+        this.left = left;
+        this.right = right;
+        this.resultFuture = executor.submit(new Callable<long[][]>() {
+            public long[][] call() throws Exception {
+                long[][] leftResult = left.getResult();
+                long[][] rightResult = right.getResult();
+                return Strassen.strassenMultiply(leftResult, rightResult);
+            }
+        });
+    }
+
+    public long[][] getResult() throws Exception {
+        if (resultFuture != null) {
+            return resultFuture.get();
+        }
+        return matrix;
+    }
 }
