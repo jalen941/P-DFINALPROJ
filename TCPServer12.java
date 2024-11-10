@@ -48,7 +48,7 @@ public class TCPServer12 {
             } else {
                 // Parse the row into longs and add to the current matrix
                 if (!isIPAddress(fromClient)) {
-                    System.out.println("Added row: " + fromClient);
+                  //  System.out.println("Added row: " + fromClient);
                     long[] row = parseRowToLong(fromClient);
                     currentMatrixRows.add(row);
                 }
@@ -63,18 +63,56 @@ public class TCPServer12 {
 
 // Suggest garbage collection
         System.gc();
-
-        // Perform Strassen multiplication (adjusted for long data type)
         long[][] resultMatrix = {};
+        // Perform Strassen multiplication (adjusted for long data type)
+      /*  long[][] resultMatrix = {};
         try {
-            resultMatrix = Strassen.multiply(matrixArray, 31);  // Update Strassen to work with long
+            resultMatrix = Strassen.multiply(matrixArray, 1);  // Update Strassen to work with long
         } catch (Exception e) {
             e.printStackTrace();
+        }*/
+
+        int[] coresToTest = {1, 3, 7, 15, 31};
+        long oneCoreTime = 0;
+        
+        for (int numCores : coresToTest) {
+            long startTime = System.nanoTime();
+            
+            // Perform Strassen multiplication with the specified number of cores
+           
+            try {
+                resultMatrix = Strassen.multiply(matrixArray, numCores);
+            } catch (Exception e) {
+                e.printStackTrace();
+                continue;
+            }
+            
+            long endTime = System.nanoTime();
+            long timeTaken = (endTime - startTime) / 1_000_000; // Convert to milliseconds
+            
+            // For 1 core, save the time taken for future speedup calculations
+            if (numCores == 1) {
+                oneCoreTime = timeTaken;
+            }
+            
+            // Calculate speedup and efficiency
+            double speedup = (double) oneCoreTime / timeTaken;
+            double efficiency = speedup / numCores;
+            
+            // Log the performance metrics
+            System.out.printf("Cores: %d | Time: %d ms | Speedup: %.2f | Efficiency: %.2f%n",
+                    numCores, timeTaken, speedup, efficiency);
         }
+        
+
+
+
+
+
 
         // Convert the result to a string and send it back to the client
         String resultString = matrixToString(resultMatrix);
-        System.out.println("Multiplication result:\n" + resultString);
+       // System.out.println("Multiplication result:\n" + resultString);
         out.println(resultString);
 
         // Closing connections
