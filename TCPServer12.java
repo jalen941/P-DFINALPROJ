@@ -11,19 +11,16 @@ public class TCPServer12 {
         PrintWriter out = null;
         BufferedReader in = null;
         InetAddress addr = InetAddress.getLocalHost();
-        String routerName = "172.20.10.2"; // ServerRouter host name (replace with your IP)
-        int SockNum = 5555; // port number
+        String routerName = "172.20.10.2"; // ServerRouter host name
+        int sockNum = 5555; // port number
 
         // Tries to connect to the ServerRouter
         try {
-            socket = new Socket(routerName, SockNum);
+            socket = new Socket(routerName, sockNum);
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        } catch (UnknownHostException e) {
-            System.err.println("Don't know about router: " + routerName);
-            System.exit(1);
-        } catch (IOException e) {
-            System.err.println("Couldn't get I/O for the connection to: " + routerName);
+        } catch (Exception e) {
+            e.printStackTrace();
             System.exit(1);
         }
 
@@ -32,96 +29,84 @@ public class TCPServer12 {
         out.println(address);
         System.out.println("ServerRouter: " + in.readLine());
 
-        // Read matrices row-by-row from client
+        // Core configurations for each matrix count
+        int[] coresForMatrices = {1, 3, 7, 16, 31}; // Cores to use for 2, 4, 8, 15, 32 matrices
+        int currentCoreIndex = 0;
+
+        // Loop to process each set of matrices
+        String fromClient;
         List<long[][]> matrices = new ArrayList<>();
         List<long[]> currentMatrixRows = new ArrayList<>();
-        String fromClient;
-
         while ((fromClient = in.readLine()) != null) {
             if (fromClient.equals("#")) {
-                // End of one matrix
-                long[][] matrix = currentMatrixRows.toArray(new long[0][0]);
-                matrices.add(matrix);
+                matrices.add(currentMatrixRows.toArray(new long[0][0]));
                 currentMatrixRows.clear();
-            } else if (fromClient.equals("DONE")) {
-                break;
-            } else {
-                // Parse the row into longs and add to the current matrix
-                if (!isIPAddress(fromClient)) {
-                  //  System.out.println("Added row: " + fromClient);
-                    long[] row = parseRowToLong(fromClient);
-                    currentMatrixRows.add(row);
-                }
+            } else if (fromClient.equals("END")) {
+                int numCores = coresForMatrices[currentCoreIndex++];
+                processMatrices(matrices.toArray(new long[0][][]), numCores, out);
+                
+                out.println("Completed processing " + matrices.toArray(new long[0][][]).length + " matrices.");
+                matrices.clear();
+                if (currentCoreIndex == coresForMatrices.length) break; // All sets processed
+            } else if (!isIPAddress(fromClient) && !fromClient.equals("DONE")) {
+                currentMatrixRows.add(parseRowToLong(fromClient));
             }
         }
 
-        // Convert list of matrices to a 3D array
-        long[][][] matrixArray = matrices.toArray(new long[matrices.size()][][]);
-        System.out.println("Received matrix array from client.");
-        matrices = null;  // Dereference list of matrices
-        currentMatrixRows = null;  // Dereference current matrix rows list
-
-// Suggest garbage collection
-        System.gc();
-        long[][] resultMatrix = {};
-        // Perform Strassen multiplication (adjusted for long data type)
-      /*  long[][] resultMatrix = {};
-        try {
-            resultMatrix = Strassen.multiply(matrixArray, 1);  // Update Strassen to work with long
-        } catch (Exception e) {
-            e.printStackTrace();
-        }*/
-
-        int[] coresToTest = {1, 3, 7, 15, 31};
-        long oneCoreTime = 0;
-        
-        for (int numCores : coresToTest) {
-            long startTime = System.nanoTime();
-            
-            // Perform Strassen multiplication with the specified number of cores
-           
-            try {
-                resultMatrix = Strassen.multiply(matrixArray, numCores);
-            } catch (Exception e) {
-                e.printStackTrace();
-                continue;
-            }
-            
-            long endTime = System.nanoTime();
-            long timeTaken = (endTime - startTime) / 1_000_000; // Convert to milliseconds
-            
-            // For 1 core, save the time taken for future speedup calculations
-            if (numCores == 1) {
-                oneCoreTime = timeTaken;
-            }
-            
-            // Calculate speedup and efficiency
-            double speedup = (double) oneCoreTime / timeTaken;
-            double efficiency = speedup / numCores;
-            
-            // Log the performance metrics
-            System.out.printf("Cores: %d | Time: %d ms | Speedup: %.2f | Efficiency: %.2f%n",
-                    numCores, timeTaken, speedup, efficiency);
-        }
-        
-
-
-
-
-
-
-        // Convert the result to a string and send it back to the client
-        String resultString = matrixToString(resultMatrix);
-       // System.out.println("Multiplication result:\n" + resultString);
-        out.println(resultString);
-
-        // Closing connections
+        // Close connections
         out.close();
         in.close();
         socket.close();
     }
 
-    // Parses a comma-separated row into a long array
+// Process matrices and log performance metrics
+private static void processMatrices(long[][][] matrixArray, int numCores, PrintWriter out) {
+    long serialTime;
+
+    // Measure the time it would take with 1 core for this specific instance
+    long serialStart = System.nanoTime();
+    try {
+        System.out.println("starting single core execution...");
+        Strassen.multiply(matrixArray, 1); // Run on a single core to get serial time
+    } catch (Exception e) {
+        System.out.println("Error during single-core execution: " + e);
+        return;
+    }
+    long serialEnd = System.nanoTime();
+    serialTime = (serialEnd - serialStart) / 1_000_000; // Serial time in ms
+
+    // Measure the parallel execution time with the specified number of cores
+    long parallelStart = System.nanoTime();
+    try {
+        System.out.println("moving on to multi core execution...");
+
+        Strassen.multiply(matrixArray, numCores); // Run with the specified number of cores
+    } catch (Exception e) {
+        System.out.println("Error during multi-core execution: " + e);
+        return;
+    }
+    System.out.println("calculating metrics...");
+
+    long parallelEnd = System.nanoTime();
+    long parallelTime = (parallelEnd - parallelStart) / 1_000_000; // Parallel time in ms
+
+    // Calculate speedup and efficiency
+    double speedup = (double) serialTime / parallelTime;
+    double efficiency = speedup / numCores;
+    if(numCores==1){
+        speedup=1;
+        efficiency=1;
+        parallelTime=serialTime;
+    }
+    System.out.println("sending metrics to client");
+
+    // Log the performance metrics
+    out.printf("Cores: %d | Serial Time: %d ms | Parallel Time: %d ms | Speedup: %.2f | Efficiency: %.2f%n",
+            numCores, serialTime, parallelTime, speedup, efficiency);
+}
+
+
+    // Helper methods
     private static long[] parseRowToLong(String row) {
         String[] values = row.split(",");
         long[] longRow = new long[values.length];
@@ -129,24 +114,10 @@ public class TCPServer12 {
             try {
                 longRow[i] = Long.parseLong(values[i]);
             } catch (NumberFormatException e) {
-                System.err.println("Error parsing value: " + values[i]);
                 longRow[i] = 0; // Default to 0 if parsing fails
             }
         }
         return longRow;
-    }
-
-    // Method to convert a 2D long array to a string
-    private static String matrixToString(long[][] matrix) {
-        StringBuilder sb = new StringBuilder();
-        for (long[] row : matrix) {
-            for (long value : row) {
-                sb.append(value).append(",");
-            }
-            sb.deleteCharAt(sb.length() - 1); // Remove trailing comma
-            sb.append(";"); // Adds semicolon for separating rows
-        }
-        return sb.toString();
     }
 
     private static boolean isIPAddress(String message) {
