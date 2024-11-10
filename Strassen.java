@@ -13,18 +13,21 @@ public class Strassen {
             leafNodes[i] = new Node(matrices[i]);
         }
 
+        // Build the tree, combining nodes in pairs until only one root node is left
         while (leafNodes.length > 1) {
             Node[] parentNodes = new Node[(leafNodes.length + 1) / 2];
             for (int i = 0; i < leafNodes.length; i += 2) {
                 if (i + 1 < leafNodes.length) {
                     parentNodes[i / 2] = new Node(leafNodes[i], leafNodes[i + 1], executor);
                 } else {
+                    // If there is an odd number of nodes, carry the last one up
                     parentNodes[i / 2] = leafNodes[i];
                 }
             }
-            leafNodes = parentNodes;
+            leafNodes = parentNodes; // Move up one level in the tree
         }
 
+        // The last remaining node is the root node with the final product
         Node root = leafNodes[0];
         long[][] finalProduct = root.getResult();
 
@@ -32,6 +35,7 @@ public class Strassen {
         return finalProduct;
     }
 
+    // Strassen's multiplication algorithm for two matrices
     public static long[][] strassenMultiply(long[][] A, long[][] B) {
         int n = A.length;
         long[][] C = new long[n][n];
@@ -122,6 +126,7 @@ public class Strassen {
     }
 }
 
+// Node class for representing tree structure and performing parallel multiplications
 class Node {
     private long[][] matrix;
     private Node left;
