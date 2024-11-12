@@ -25,7 +25,7 @@ public class TCPClient {
 
         // Define dimensions for matrices
         int dimensions = 256;
-        int[] matrixCounts = {2, 4, 8, 15, 32}; // Number of matrices to send in each round
+        int[] matrixCounts = {2, 4, 8, 16, 32}; // Number of matrices to send in each round
 
         // Send initial address information and receive confirmation
         String address = "172.20.10.2"; // destination IP (Server)
