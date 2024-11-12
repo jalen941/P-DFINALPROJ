@@ -30,7 +30,7 @@ public class TCPServer12 {
         System.out.println("ServerRouter: " + in.readLine());
 
         // Core configurations for each matrix count
-        int[] coresForMatrices = {1, 3, 7, 16, 31}; // Cores to use for 2, 4, 8, 15, 32 matrices
+        int[] coresForMatrices = {1, 3, 7, 15, 31}; // Cores to use for 2, 4, 8, 15, 32 matrices
         int currentCoreIndex = 0;
 
         // Loop to process each set of matrices
