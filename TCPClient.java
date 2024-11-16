@@ -24,25 +24,23 @@ public class TCPClient {
         }
 
         // Define dimensions for matrices
-        int dimensions = 256;
-        int[] matrixCounts = {2, 4, 8, 16, 32}; // Number of matrices to send in each round
+        int dimensions = 8;
+        int[] matrixCounts = {2, 4, 8, 16, 32}; 
 
-        // Send initial address information and receive confirmation
         String address = "172.20.10.2"; // destination IP (Server)
         out.println(address);
         System.out.println("ServerRouter: " + in.readLine());
         out.println(host); // Send client IP
 
-        // Stream the matrix data in increments
-        for (int count : matrixCounts) {
-            System.out.println("Sending " + count + " matrices with dimensions: " + dimensions + "x" + dimensions);
-            streamMatrices(out, count, dimensions);
+        for (int i=0; i < matrixCounts.length; i++ ) {
+           // System.out.println(i + "th run");
+            System.out.println("Sending " + matrixCounts[i] + " matrices with dimensions: " + dimensions + "x" + dimensions);
+            streamMatrices(out, matrixCounts[i], dimensions);
 
-            // Await response from server after processing
             String fromServer;
             while ((fromServer = in.readLine()) != null) {
                 System.out.println("Server: " + fromServer);
-                if (fromServer.equals("Completed processing " + count + " matrices.")) {
+                if (fromServer.equals("Completed processing " + matrixCounts[i] + " matrices.")) {
                     break;
                 }
             }
@@ -55,7 +53,6 @@ public class TCPClient {
         socket.close();
     }
 
-    // Streams matrices to the server
     public static void streamMatrices(PrintWriter out, int numberOfMatrices, int dimensions) {
         Random rand = new Random();
    
@@ -68,8 +65,8 @@ public class TCPClient {
                 row.deleteCharAt(row.length() - 1);
                 out.println(row.toString());
             }
-            out.println("#"); // End of matrix indicator
+            out.println("#"); 
         }
-        out.println("END"); // End of this batch of matrices
+        out.println("END");
     }
 }
