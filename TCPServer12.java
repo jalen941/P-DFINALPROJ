@@ -6,7 +6,6 @@ import java.util.regex.Pattern;
 
 public class TCPServer12 {
     public static void main(String[] args) throws IOException {
-        // Variables for setting up connection and communication
         Socket socket = null;
         PrintWriter out = null;
         BufferedReader in = null;
@@ -29,11 +28,9 @@ public class TCPServer12 {
         out.println(address);
         System.out.println("ServerRouter: " + in.readLine());
 
-        // Core configurations for each matrix count
-        int[] coresForMatrices = {1, 3, 7, 15, 31}; // Cores to use for 2, 4, 8, 15, 32 matrices
+        int[] coresForMatrices = {1, 3, 7, 15, 31}; 
         int currentCoreIndex = 0;
 
-        // Loop to process each set of matrices
         String fromClient;
         List<long[][]> matrices = new ArrayList<>();
         List<long[]> currentMatrixRows = new ArrayList<>();
@@ -47,7 +44,7 @@ public class TCPServer12 {
                 
                 out.println("Completed processing " + matrices.toArray(new long[0][][]).length + " matrices.");
                 matrices.clear();
-                if (currentCoreIndex == coresForMatrices.length) break; // All sets processed
+                if (currentCoreIndex == coresForMatrices.length) break; 
             } else if (!isIPAddress(fromClient) && !fromClient.equals("DONE")) {
                 currentMatrixRows.add(parseRowToLong(fromClient));
             }
@@ -59,28 +56,25 @@ public class TCPServer12 {
         socket.close();
     }
 
-// Process matrices and log performance metrics
 private static void processMatrices(long[][][] matrixArray, int numCores, PrintWriter out) {
     long serialTime;
 
-    // Measure the time it would take with 1 core for this specific instance
     long serialStart = System.nanoTime();
     try {
         System.out.println("starting single core execution...");
-        Strassen.multiply(matrixArray, 1); // Run on a single core to get serial time
+        Strassen.multiply(matrixArray, 1); 
     } catch (Exception e) {
         System.out.println("Error during single-core execution: " + e);
         return;
     }
     long serialEnd = System.nanoTime();
-    serialTime = (serialEnd - serialStart) / 1_000_000; // Serial time in ms
+    serialTime = (serialEnd - serialStart) / 1_000_000; 
 
-    // Measure the parallel execution time with the specified number of cores
     long parallelStart = System.nanoTime();
     try {
         System.out.println("moving on to multi core execution...");
 
-        Strassen.multiply(matrixArray, numCores); // Run with the specified number of cores
+        Strassen.multiply(matrixArray, numCores); 
     } catch (Exception e) {
         System.out.println("Error during multi-core execution: " + e);
         return;
@@ -88,9 +82,8 @@ private static void processMatrices(long[][][] matrixArray, int numCores, PrintW
     System.out.println("calculating metrics...");
 
     long parallelEnd = System.nanoTime();
-    long parallelTime = (parallelEnd - parallelStart) / 1_000_000; // Parallel time in ms
+    long parallelTime = (parallelEnd - parallelStart) / 1_000_000; 
 
-    // Calculate speedup and efficiency
     double speedup = (double) serialTime / parallelTime;
     double efficiency = speedup / numCores;
     if(numCores==1){
@@ -100,13 +93,11 @@ private static void processMatrices(long[][][] matrixArray, int numCores, PrintW
     }
     System.out.println("sending metrics to client");
 
-    // Log the performance metrics
     out.printf("Cores: %d | Serial Time: %d ms | Parallel Time: %d ms | Speedup: %.2f | Efficiency: %.2f%n",
             numCores, serialTime, parallelTime, speedup, efficiency);
 }
 
 
-    // Helper methods
     private static long[] parseRowToLong(String row) {
         String[] values = row.split(",");
         long[] longRow = new long[values.length];
@@ -114,14 +105,14 @@ private static void processMatrices(long[][][] matrixArray, int numCores, PrintW
             try {
                 longRow[i] = Long.parseLong(values[i]);
             } catch (NumberFormatException e) {
-                longRow[i] = 0; // Default to 0 if parsing fails
+                longRow[i] = 0; 
             }
         }
         return longRow;
     }
 
     private static boolean isIPAddress(String message) {
-        String ipPattern = "^([0-9]{1,3}\\.){3}[0-9]{1,3}$"; // basic IPv4 pattern
+        String ipPattern = "^([0-9]{1,3}\\.){3}[0-9]{1,3}$"; 
         return Pattern.matches(ipPattern, message);
     }
 }
