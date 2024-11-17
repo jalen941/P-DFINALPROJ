@@ -18,7 +18,7 @@ public class Strassen {
                 if (i + 1 < leafNodes.length) {
                     parentNodes[i / 2] = new Node(leafNodes[i], leafNodes[i + 1], executor);
                 } else {
-                    parentNodes[i / 2] = leafNodes[i];
+                    System.out.println("Odd number of leaves, something is wrong");
                 }
             }
             leafNodes = parentNodes; 
