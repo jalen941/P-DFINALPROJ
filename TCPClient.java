@@ -13,7 +13,6 @@ public class TCPClient {
         String routerName = "172.20.10.2"; // ServerRouter host name
         int sockNum = 5555; // port number
 
-        // Connect to the ServerRouter
         try {
             socket = new Socket(routerName, sockNum);
             out = new PrintWriter(socket.getOutputStream(), true);
@@ -23,7 +22,6 @@ public class TCPClient {
             System.exit(1);
         }
 
-        // Define dimensions for matrices
         int dimensions = 8;
         int[] matrixCounts = {2, 4, 8, 16, 32}; 
 
@@ -46,7 +44,6 @@ public class TCPClient {
             }
         }
 
-        // Close connection after all matrices have been processed
         out.println("DONE");
         out.close();
         in.close();
